@@ -167,6 +167,7 @@ module spi_state_machine #(
   reg [10:0] config_current_threshold [0:num_motors-1];
   reg config_invert_highside [0:num_motors-1];
   reg config_invert_lowside [0:num_motors-1];
+  reg [3:0] config_deadtime [0:num_motors-1];
   reg [7:0] config_chargepump_period; // one chargepump for all
 
   // ---
@@ -312,6 +313,7 @@ module spi_state_machine #(
           .config_chargepump_period (config_chargepump_period),
           .config_invert_highside (config_invert_highside[i]),
           .config_invert_lowside (config_invert_lowside[i]),
+          .config_deadtime(config_deadtime[i]),
           //.cos_table (cos_table),
           .step (step[i]),
           .dir (dir[i]),
@@ -442,6 +444,7 @@ module spi_state_machine #(
       config_current_threshold[nmot] <= 1024;
       config_invert_highside[nmot] <= `DEFAULT_BRIDGE_INVERTING;
       config_invert_lowside[nmot] <= `DEFAULT_BRIDGE_INVERTING;
+      config_deadtime[nmot] <= 0;
     end
 
   end else if (resetn) begin

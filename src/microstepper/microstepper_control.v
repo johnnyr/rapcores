@@ -11,9 +11,10 @@ module microstepper_control (
     output          phase_a2_h_out,
     output          phase_b1_h_out,
     output          phase_b2_h_out,
-    input   [9:0]   config_fastdecay_threshold,
+    input    [9:0]  config_fastdecay_threshold,
     input           config_invert_highside,
     input           config_invert_lowside,
+    input    [3:0]  config_deadtime,
     input           step,
     input           dir,
     input           enable_in,
@@ -37,6 +38,10 @@ module microstepper_control (
 );
   reg [2:0] step_r;
   reg [1:0] dir_r;
+  reg [3:0] deadtime_counter_a1;
+  reg [3:0] deadtime_counter_a2;
+  reg [3:0] deadtime_counter_b1;
+  reg [3:0] deadtime_counter_b2;
 
   reg       enable;
 
@@ -75,6 +80,34 @@ module microstepper_control (
       end
     end
 
+  always @(posedge clk) begin
+    if (phase_a1_l_control) 
+      deadtime_counter_a1 <= config_deadtime;
+    else if (deadtime_counter_a1 > 0)
+      deadtime_counter_a1 <= deadtime_counter_a1 - 1;
+  end
+
+  always @(posedge clk) begin
+    if (phase_a2_l_control) 
+      deadtime_counter_a2 <= config_deadtime;
+    else if (deadtime_counter_a2 > 0)
+      deadtime_counter_a2 <= deadtime_counter_a2 - 1;
+  end
+
+  always @(posedge clk) begin
+    if (phase_a1_l_control) 
+      deadtime_counter_b1 <= config_deadtime;
+    else if (deadtime_counter_b1 > 0)
+      deadtime_counter_b1 <= deadtime_counter_b1 - 1;
+  end
+
+  always @(posedge clk) begin
+    if (phase_a1_l_control) 
+      deadtime_counter_b2 <= config_deadtime;
+    else if (deadtime_counter_b2 > 0)
+      deadtime_counter_b2 <= deadtime_counter_b2 - 1;
+  end
+
   wire phase_a1_h, phase_a1_l, phase_a2_h, phase_a2_l;
   wire phase_b1_h, phase_b1_l, phase_b2_h, phase_b2_l;
 
@@ -97,10 +130,10 @@ module microstepper_control (
   wire phase_b1_l_control = phase_b1_l | !enable;
   wire phase_b2_l_control = phase_b2_l | !enable;
   // High side - enable, and fault shutdown
-  wire phase_a1_h_control = phase_a1_h && faultn && enable;
-  wire phase_a2_h_control = phase_a2_h && faultn && enable;
-  wire phase_b1_h_control = phase_b1_h && faultn && enable;
-  wire phase_b2_h_control = phase_b2_h && faultn && enable;
+  wire phase_a1_h_control = phase_a1_h && faultn && enable && !phase_a1_l_control && !deadtime_counter_a1;
+  wire phase_a2_h_control = phase_a2_h && faultn && enable && !phase_a2_l_control && !deadtime_counter_a2;
+  wire phase_b1_h_control = phase_b1_h && faultn && enable && !phase_b1_l_control && !deadtime_counter_b1;
+  wire phase_b2_h_control = phase_b2_h && faultn && enable && !phase_b2_l_control && !deadtime_counter_b2;
 
   // Fast decay is first x ticks of off time
   // default fast decay = 706

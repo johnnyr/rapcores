@@ -28,6 +28,7 @@ module microstepper_tb(
     reg         [7:0]   config_chargepump_period;
     reg                 config_invert_highside;
     reg                 config_invert_lowside;
+    reg         [3:0]   config_deadtime;
 
     wire resetn;
     reg [7:0] resetn_counter = 0;
@@ -67,6 +68,7 @@ module microstepper_tb(
             config_chargepump_period = 91;
             config_invert_highside = 0;
             config_invert_lowside = 0;
+            config_deadtime = 0;
             step_clock = 0;
         end
         else begin
@@ -124,6 +126,7 @@ module microstepper_tb(
         .config_chargepump_period(      config_chargepump_period    ),
         .config_invert_highside(        config_invert_highside      ),
         .config_invert_lowside(         config_invert_lowside       ),
+        .config_deadtime(               config_deadtime             ),
     );
     pwm_duty duty1(
         .clk(clk),
