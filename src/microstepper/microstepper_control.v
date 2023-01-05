@@ -102,7 +102,7 @@ module microstepper_control (
   end
 
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    if (phase_a2_l_control) 
       deadtime_counter_b2 <= config_deadtime;
     else if (deadtime_counter_b2 > 0)
       deadtime_counter_b2 <= deadtime_counter_b2 - 1;
