@@ -82,8 +82,7 @@ module microstepper_top (
     .blank_timer1(blank_timer1),
     .off_timer0(off_timer0),
     .off_timer1(off_timer1),
-    .minimum_on_timer0(minimum_on_timer0),
-    .minimum_on_timer1(minimum_on_timer1)
+    .config_minimum_on_time(config_minimum_on_time)
 );
 
 wire        off_timer0_done;
@@ -123,22 +122,6 @@ wire        off_timer1_done;
       .start_enable(off_timer1_done),
       .start_time  (config_blanktime),
       .timer       (blank_timer1)
-  );
-
-  mytimer_8 minimumontimer0 (
-      .clk         (clk),
-      .resetn      (resetn),
-      .start_enable(off_timer0_done),
-      .start_time  (config_minimum_on_time),
-      .timer       (minimum_on_timer0)
-  );
-
-  mytimer_8 minimumontimer1 (
-      .clk         (clk),
-      .resetn      (resetn),
-      .start_enable(off_timer1_done),
-      .start_time  (config_minimum_on_time),
-      .timer       (minimum_on_timer1)
   );
 
   chargepump chargepump0 (

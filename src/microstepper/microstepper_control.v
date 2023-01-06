@@ -32,8 +32,7 @@ module microstepper_control (
     input      [7:0] blank_timer1,
     input      [9:0] off_timer0,
     input      [9:0] off_timer1,
-    input      [7:0] minimum_on_timer0,
-    input      [7:0]   minimum_on_timer1
+    input      [7:0] config_minimum_on_time
 //    input           mixed_decay_enable,
 );
   reg [2:0] step_r;
@@ -71,8 +70,6 @@ module microstepper_control (
   // Fault latches until reset
   always @(posedge clk) begin
       if (!resetn) begin
-//        fault0 <= 0;
-//        fault1 <= 0;
         faultn <= 1;
       end
       else if (faultn) begin
@@ -102,11 +99,27 @@ module microstepper_control (
   end
 
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    if (phase_a2_l_control) 
       deadtime_counter_b2 <= config_deadtime;
     else if (deadtime_counter_b2 > 0)
       deadtime_counter_b2 <= deadtime_counter_b2 - 1;
   end
+
+  mytimer_8 minimumontimer0 (
+      .clk         (clk),
+      .resetn      (resetn),
+      .start_enable(off_timer0_done),
+      .start_time  (config_minimum_on_time),
+      .timer       (minimum_on_timer0)
+  );
+
+  mytimer_8 minimumontimer1 (
+      .clk         (clk),
+      .resetn      (resetn),
+      .start_enable(off_timer1_done),
+      .start_time  (config_minimum_on_time),
+      .timer       (minimum_on_timer1)
+  );
 
   wire phase_a1_h, phase_a1_l, phase_a2_h, phase_a2_l;
   wire phase_b1_h, phase_b1_l, phase_b2_h, phase_b2_l;
@@ -123,37 +136,48 @@ module microstepper_control (
   assign phase_b1_h_out = config_invert_highside ^  phase_b1_h_control;
   assign phase_b2_h_out = config_invert_highside ^  phase_b2_h_control;
 
+  wire phase_a1_l_control, phase_a1_h_control;
+  wire phase_a2_l_control, phase_a2_h_control;
+  wire phase_b1_l_control, phase_b1_h_control;
+  wire phase_b2_l_control, phase_b2_h_control;
 
   // Low Side - enable
-  wire phase_a1_l_control = phase_a1_l | !enable;
-  wire phase_a2_l_control = phase_a2_l | !enable;
-  wire phase_b1_l_control = phase_b1_l | !enable;
-  wire phase_b2_l_control = phase_b2_l | !enable;
+  assign phase_a1_l_control = phase_a1_l | !enable;
+  assign phase_a2_l_control = phase_a2_l | !enable;
+  assign phase_b1_l_control = phase_b1_l | !enable;
+  assign phase_b2_l_control = phase_b2_l | !enable;
   // High side - enable, and fault shutdown
-  wire phase_a1_h_control = phase_a1_h && faultn && enable && !phase_a1_l_control && !deadtime_counter_a1;
-  wire phase_a2_h_control = phase_a2_h && faultn && enable && !phase_a2_l_control && !deadtime_counter_a2;
-  wire phase_b1_h_control = phase_b1_h && faultn && enable && !phase_b1_l_control && !deadtime_counter_b1;
-  wire phase_b2_h_control = phase_b2_h && faultn && enable && !phase_b2_l_control && !deadtime_counter_b2;
+  assign phase_a1_h_control = phase_a1_h && faultn && enable && !phase_a1_l_control;
+  assign phase_a2_h_control = phase_a2_h && faultn && enable && !phase_a2_l_control;
+  assign phase_b1_h_control = phase_b1_h && faultn && enable && !phase_b1_l_control;
+  assign phase_b2_h_control = phase_b2_h && faultn && enable && !phase_b2_l_control;
+
+  wire fastDecay0;
+  wire fastDecay1;
+  wire slowDecay0;
+  wire slowDecay1;
 
   // Fast decay is first x ticks of off time
   // default fast decay = 706
-  wire fastDecay0 = off_timer0 >= config_fastdecay_threshold;
-  wire fastDecay1 = off_timer1 >= config_fastdecay_threshold;
+  assign fastDecay0 = off_timer0 >= config_fastdecay_threshold;
+  assign fastDecay1 = off_timer1 >= config_fastdecay_threshold;
 
   // Slow decay remainder of off time - Active high
-  wire slowDecay0 = (off_timer0 != 0) & (fastDecay0 == 0);
-  wire slowDecay1 = (off_timer1 != 0) & (fastDecay1 == 0);
+  assign slowDecay0 = (off_timer0 != 0) & (fastDecay0 == 0);
+  assign slowDecay1 = (off_timer1 != 0) & (fastDecay1 == 0);
 
   // Half bridge high side is active
-  // WHEN slow decay is NOT active
+  // WHEN deadtime_counter ends
+  // AND
+  // slow decay is NOT active
   // AND
   // ( fast decay active AND would normally be off this phase )
   // OR
   // Should be on to drive this phase / polarity (microstepper_counter)
-  assign phase_a1_h = !slowDecay0 && ( fastDecay0 ? !s1 : s1 );
-  assign phase_a2_h = !slowDecay0 && ( fastDecay0 ? !s2 : s2 );
-  assign phase_b1_h = !slowDecay1 && ( fastDecay1 ? !s3 : s3 );
-  assign phase_b2_h = !slowDecay1 && ( fastDecay1 ? !s4 : s4 );
+  assign phase_a1_h = !deadtime_counter_a1 && !slowDecay0 && ( fastDecay0 ? !s1 : s1 );
+  assign phase_a2_h = !deadtime_counter_a2 && !slowDecay0 && ( fastDecay0 ? !s2 : s2 );
+  assign phase_b1_h = !deadtime_counter_b1 && !slowDecay1 && ( fastDecay1 ? !s3 : s3 );
+  assign phase_b2_h = !deadtime_counter_b2 && !slowDecay1 && ( fastDecay1 ? !s4 : s4 );
   // Low side is active
   // WHEN slow decay is active
   // OR
@@ -164,6 +188,7 @@ module microstepper_control (
   assign phase_b2_l = slowDecay1 | ( fastDecay1 ? s4 : !s4 );
 
   // Fixed off time peak current controller off time start
+  // Total off time = config_offtime + config_blanktime
   assign offtimer_en0 = analog_cmp1 & (blank_timer0 == 0) & (off_timer0 == 0);
   assign offtimer_en1 = analog_cmp2 & (blank_timer1 == 0) & (off_timer1 == 0);
 
