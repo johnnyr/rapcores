@@ -77,29 +77,43 @@ module microstepper_control (
       end
     end
 
+  reg phase_a1_l_control_prev, phase_a2_l_control_prev, phase_b1_l_control_prev, phase_b2_l_control_prev;
+  reg phase_a1_h_control_prev, phase_a2_h_control_prev, phase_b1_h_control_prev, phase_b2_h_control_prev;
+
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    phase_a1_l_control_prev <= phase_a1_l_control;
+    phase_a2_l_control_prev <= phase_a2_l_control;
+    phase_b1_l_control_prev <= phase_b1_l_control;
+    phase_b2_l_control_prev <= phase_b2_l_control;
+    phase_a1_h_control_prev <= phase_a1_l_control;
+    phase_a2_h_control_prev <= phase_a2_l_control;
+    phase_b1_h_control_prev <= phase_b1_l_control;
+    phase_b2_h_control_prev <= phase_b2_l_control;
+  end
+
+  always @(posedge clk) begin
+    if (!phase_a1_l_control_prev and phase_a1_l_control) 
       deadtime_counter_a1 <= config_deadtime;
     else if (deadtime_counter_a1 > 0)
       deadtime_counter_a1 <= deadtime_counter_a1 - 1;
   end
 
   always @(posedge clk) begin
-    if (phase_a2_l_control) 
+    if (phase_a2_control) 
       deadtime_counter_a2 <= config_deadtime;
     else if (deadtime_counter_a2 > 0)
       deadtime_counter_a2 <= deadtime_counter_a2 - 1;
   end
 
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    if (phase_b1_control) 
       deadtime_counter_b1 <= config_deadtime;
     else if (deadtime_counter_b1 > 0)
       deadtime_counter_b1 <= deadtime_counter_b1 - 1;
   end
 
   always @(posedge clk) begin
-    if (phase_a2_l_control) 
+    if (phase_b2_control) 
       deadtime_counter_b2 <= config_deadtime;
     else if (deadtime_counter_b2 > 0)
       deadtime_counter_b2 <= deadtime_counter_b2 - 1;
@@ -156,6 +170,23 @@ module microstepper_control (
   wire fastDecay1;
   wire slowDecay0;
   wire slowDecay1;
+
+// High Side A1
+//         /----\
+// _______/      \__________________
+// Slow Dead On  Dead Fast Dead Slow
+// ----\             /--------------
+//      \___________/
+// Low Side A1
+////////////////////////////////////
+// High Side A2
+//                    /--\
+// __________________/    \_________
+// Slow Dead On  Dead Fast Dead Slow
+// --------------\             /----
+//                \-----------/
+// Low Side Aw
+////////////////////////////////////
 
   // Fast decay is first x ticks of off time
   // default fast decay = 706
