@@ -89,13 +89,17 @@ module microstepper_top (
 wire        off_timer0_done;
 wire        off_timer1_done;
 
+// adding deadtime to these configs. May need to refactor logic if need to save gates.
+reg [9:0] off_time = config_offtime + config_deadtime;
+reg [3:0] minimum_on_time = config_minimum_on_time + config_deadtime;
+
   mytimer_10 #(
       .WIDTH(10)
   ) offtimer0 (
       .clk         (clk),
       .resetn      (resetn),
       .start_enable(offtimer_en0),
-      .start_time  (config_offtime),
+      .start_time  (off_time),
       .timer       (off_timer0),
       .done         (off_timer0_done)
   );
@@ -104,7 +108,7 @@ wire        off_timer1_done;
       .clk         (clk),
       .resetn      (resetn),
       .start_enable(offtimer_en1),
-      .start_time  (config_offtime),
+      .start_time  (off_time),
       .timer       (off_timer1),
       .done         (off_timer1_done)
   );
@@ -129,7 +133,7 @@ wire        off_timer1_done;
       .clk         (clk),
       .resetn      (resetn),
       .start_enable(off_timer0_done),
-      .start_time  (config_minimum_on_time),
+      .start_time  (minimum_on_time),
       .timer       (minimum_on_timer0)
   );
 
@@ -137,7 +141,7 @@ wire        off_timer1_done;
       .clk         (clk),
       .resetn      (resetn),
       .start_enable(off_timer1_done),
-      .start_time  (config_minimum_on_time),
+      .start_time  (minimum_on_time),
       .timer       (minimum_on_timer1)
   );
 

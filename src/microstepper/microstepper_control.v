@@ -80,32 +80,114 @@ module microstepper_control (
       end
     end
 
+
+  // Dead time
+  // High Side A1
+  //         /----\
+  // _______/      \__________________
+  // Slow Dead On  Dead Fast Dead Slow
+  // ----\             /--------------
+  //      \___________/
+  // Low Side A1
+  ////////////////////////////////////
+  // Comparator
+  // _____________/-\_________________
+  ////////////////////////////////////
+  // High Side A2
+  //                    /--\
+  // __________________/    \_________
+  // Slow Dead On  Dead Fast Dead Slow
+  // --------------\             /----
+  //                \-----------/
+  // Low Side A2
+  ////////////////////////////////////
+
+
+  // Catch turn off event for dead time.
+  reg phase_a1_l_previous;
+  reg phase_a2_l_previous;
+  reg phase_b1_l_previous;
+  reg phase_b2_l_previous;
+  reg phase_a1_h_previous;
+  reg phase_a2_h_previous;
+  reg phase_b1_h_previous;
+  reg phase_b2_h_previous;
+
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    phase_a1_l_previous <= phase_a1_l_control;
+    phase_a2_l_previous <= phase_a2_l_control;
+    phase_b1_l_previous <= phase_b1_l_control;
+    phase_b2_l_previous <= phase_b2_l_control;
+    phase_a1_h_previous <= phase_a1_h_control;
+    phase_a2_h_previous <= phase_a2_h_control;
+    phase_b1_h_previous <= phase_b1_h_control;
+    phase_b2_h_previous <= phase_b2_h_control;
+  end
+
+  wire phase_a1_l_falling_edge = (phase_a1_l_previous && !phase_a1_l_control);
+  wire phase_a2_l_falling_edge = (phase_a2_l_previous && !phase_a2_l_control);
+  wire phase_b1_l_falling_edge = (phase_b1_l_previous && !phase_b1_l_control);
+  wire phase_b2_l_falling_edge = (phase_b2_l_previous && !phase_b2_l_control);
+  wire phase_a1_h_falling_edge = (phase_a1_h_previous && !phase_a1_h_control);
+  wire phase_a2_h_falling_edge = (phase_a2_h_previous && !phase_a2_h_control);
+  wire phase_b1_h_falling_edge = (phase_b1_h_previous && !phase_b1_h_control);
+  wire phase_b2_h_falling_edge = (phase_b2_h_previous && !phase_b2_h_control);
+
+  reg deadtime_a1;
+  reg deadtime_a2;
+  reg deadtime_b1;
+  reg deadtime_b2;
+
+  always @(posedge clk) begin
+    if (!resetn)
+      deadtime_counter_a1 <= 0;
+    else if (phase_a1_l_falling_edge | phase_a1_h_falling_edge) 
       deadtime_counter_a1 <= config_deadtime;
     else if (deadtime_counter_a1 > 0)
       deadtime_counter_a1 <= deadtime_counter_a1 - 1;
+    if (deadtime_counter_a1 | phase_a1_l_falling_edge | phase_a1_h_falling_edge)
+      deadtime_a1 <= 1;
+    else
+      deadtime_a1 <= 0;
   end
 
   always @(posedge clk) begin
-    if (phase_a2_l_control) 
+    if (!resetn)
+      deadtime_counter_a2 <= 0;
+    else if (phase_a2_l_falling_edge | phase_a2_h_falling_edge) 
       deadtime_counter_a2 <= config_deadtime;
     else if (deadtime_counter_a2 > 0)
       deadtime_counter_a2 <= deadtime_counter_a2 - 1;
+    if (deadtime_counter_a2 | phase_a2_l_falling_edge | phase_a2_h_falling_edge)
+      deadtime_a2 <= 1;
+    else
+      deadtime_a2 <= 0;
   end
 
   always @(posedge clk) begin
-    if (phase_a1_l_control) 
+    if (!resetn)
+      deadtime_counter_b1 <= 0;
+    else if (phase_b1_l_falling_edge | phase_b1_h_falling_edge) 
       deadtime_counter_b1 <= config_deadtime;
     else if (deadtime_counter_b1 > 0)
       deadtime_counter_b1 <= deadtime_counter_b1 - 1;
+    if (deadtime_counter_b1 | phase_b1_l_falling_edge | phase_b1_h_falling_edge)
+      deadtime_b1 <= 1;
+    else
+      deadtime_b1 <= 0;
   end
 
   always @(posedge clk) begin
-    if (phase_a2_l_control) 
+    if (!resetn)
+      deadtime_counter_b2 <= 0;
+    else if (phase_b2_l_falling_edge | phase_b2_h_falling_edge) 
       deadtime_counter_b2 <= config_deadtime;
     else if (deadtime_counter_b2 > 0)
       deadtime_counter_b2 <= deadtime_counter_b2 - 1;
+    if (deadtime_counter_b2 | phase_b2_l_falling_edge | phase_b2_h_falling_edge)
+      deadtime_b2 <= 1;
+    else
+      deadtime_b2 <= 0;
   end
 
   wire phase_a1_h, phase_a1_l, phase_a2_h, phase_a2_l;
@@ -125,15 +207,16 @@ module microstepper_control (
 
 
   // Low Side - enable
-  wire phase_a1_l_control = phase_a1_l | !enable;
-  wire phase_a2_l_control = phase_a2_l | !enable;
-  wire phase_b1_l_control = phase_b1_l | !enable;
-  wire phase_b2_l_control = phase_b2_l | !enable;
+  // One clk of deadtime included on phase_a1_h_falling_edge then the dead time count
+  wire phase_a1_l_control = ( phase_a1_l && !deadtime_a1 && !phase_a1_h_falling_edge ) | !enable;
+  wire phase_a2_l_control = ( phase_a2_l && !deadtime_a2 && !phase_a2_h_falling_edge ) | !enable;
+  wire phase_b1_l_control = ( phase_b1_l && !deadtime_b1 && !phase_b1_h_falling_edge ) | !enable;
+  wire phase_b2_l_control = ( phase_b2_l && !deadtime_b2 && !phase_b2_h_falling_edge ) | !enable;
   // High side - enable, and fault shutdown
-  wire phase_a1_h_control = phase_a1_h && faultn && enable && !phase_a1_l_control && !deadtime_counter_a1;
-  wire phase_a2_h_control = phase_a2_h && faultn && enable && !phase_a2_l_control && !deadtime_counter_a2;
-  wire phase_b1_h_control = phase_b1_h && faultn && enable && !phase_b1_l_control && !deadtime_counter_b1;
-  wire phase_b2_h_control = phase_b2_h && faultn && enable && !phase_b2_l_control && !deadtime_counter_b2;
+  wire phase_a1_h_control = phase_a1_h && faultn && enable && !phase_a1_l_control && !deadtime_a1 && !phase_a1_l_falling_edge;
+  wire phase_a2_h_control = phase_a2_h && faultn && enable && !phase_a2_l_control && !deadtime_a2 && !phase_a2_l_falling_edge;
+  wire phase_b1_h_control = phase_b1_h && faultn && enable && !phase_b1_l_control && !deadtime_b1 && !phase_b1_l_falling_edge;
+  wire phase_b2_h_control = phase_b2_h && faultn && enable && !phase_b2_l_control && !deadtime_b2 && !phase_b2_l_falling_edge;
 
   // Fast decay is first x ticks of off time
   // default fast decay = 706

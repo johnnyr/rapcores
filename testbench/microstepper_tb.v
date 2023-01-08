@@ -68,7 +68,7 @@ module microstepper_tb(
             config_chargepump_period = 91;
             config_invert_highside = 0;
             config_invert_lowside = 0;
-            config_deadtime = 0;
+            config_deadtime = 3;
             step_clock = 0;
         end
         else begin
